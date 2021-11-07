@@ -7,3 +7,6 @@
 - Email: gabrielseabra@alunos.utfpr.edu.br
 
 
+# Introdução
+
+Este assignment tem como objetivo prever se passageiros de um titanic faleceram durante um cruzeiro.
