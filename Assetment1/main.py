@@ -1,13 +1,18 @@
 #loading the data
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectFromModel
-from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score, StratifiedKFold, GridSearchCV
+from sklearn.preprocessing import LabelEncoder
+from sklearn import metrics
 import numpy as np
 import pandas as pd
 
+
 #############################################################################################################
+#pre processing
 train_data = pd.read_csv("train.csv", sep=";")
+
+
 titles = set()
 for name in train_data['Name']:
     titles.add(name.split(',')[1].split('.')[0].strip())
@@ -77,10 +82,18 @@ def process_family():
     return train_data
 
 
-def process_fare():
+
+def process_cabin():
     global train_data
-    train_data.Fare.fillna(train_data.iloc[:891].Fare.mean(), inplace=True)
+    train_data['Cabin'] = train_data['Cabin'].fillna(0)                     # Zerando os que não possuem cabine
+    class_le = LabelEncoder()
+    train_data = train_data.apply(lambda col: class_le.fit_transform(col.astype(str)), axis=0, result_type='expand')
+    x = class_le.fit_transform(train_data['Cabin'].values)
     return train_data
+
+def compute_score(clf, X, y, scoring='accuracy'):
+    xval = cross_val_score(clf, X, y, cv = 5, scoring=scoring)
+    return np.mean(xval)
 
 
 train_data = get_titles()
@@ -88,33 +101,61 @@ train_data = process_pclass()
 train_data = process_embarked()
 train_data = process_sex()
 train_data = process_ticket()
-train_data = process_fare()
+train_data = process_family()
+train_data = process_cabin()
 
-#pre processing
 train_data = train_data.dropna(subset=['Age'])                                  #removendo linhas da idade que são NaN
-train_data['Cabin'] = train_data['Cabin'].fillna(0)                             #Zerando os que não possuem cabine
+train_data.drop('SibSp', inplace=True, axis=1)                                  #Excluindo coluna de SibSp
+train_data.drop('Parch', inplace=True, axis=1)                                  #Excluindo coluna de Parch
 
 
+x = train_data.iloc[:, 3:]                                                                #Features
+y = train_data['Survived'].values                                                         #Classe vivo ou morto
 
-x = train_data.iloc[:, 3:]                                                 #Features
-y = train_data[["Survived"]]                                           #Classe vivo ou morto
-print(x)
+clf = RandomForestClassifier(n_estimators=50, max_features='sqrt')
+models = [clf]
+clf.fit(x, y)
 
-#clf = RandomForestClassifier(n_estimators=50, max_features='sqrt')
-#clf = clf.fit(x, y)
-#features = pd.DataFrame()                                           #Definindo features
-#features['feature'] = x.columns
-#features['importance'] = clf.feature_importances_
-#features.sort_values(by=['importance'], ascending=True, inplace=True)
-#features.set_index('feature', inplace=True)
-#features.plot(kind='barh', figsize=(25, 25))
+for model in models:
+    print('Cross-validation of : {0}'.format(model.__class__))
+    score = compute_score(clf=model, X=x, y=y, scoring='accuracy')
+    print('CV score = {0}'.format(score))
+    print('****')
 
+# turn run_gs to True if you want to run the gridsearch again.
+run_gs = True
 
-#train = combined.iloc[:891]
-#test = combined.iloc[891:]
+if run_gs:
+    parameter_grid = {
+        'max_depth': [4, 6, 8],
+        'n_estimators': [50, 10],
+        'max_features': ['sqrt', 'auto', 'log2'],
+        'min_samples_split': [2, 3, 10],
+        'min_samples_leaf': [1, 3, 10],
+        'bootstrap': [True, False],
+    }
+    forest = RandomForestClassifier()
+    cross_validation = StratifiedKFold(n_splits=5)
 
-#print(x)
-#print(y)
+    grid_search = GridSearchCV(forest,
+                               scoring='accuracy',
+                               param_grid=parameter_grid,
+                               cv=cross_validation,
+                               verbose=1
+                               )
 
+    grid_search.fit(x, y)
+    model = grid_search
+    parameters = grid_search.best_params_
 
+    print('Best score: {}'.format(grid_search.best_score_))
+    print('Best parameters: {}'.format(grid_search.best_params_))
+
+else:
+    parameters = {'bootstrap': False, 'min_samples_leaf': 3, 'n_estimators': 50,
+                  'min_samples_split': 10, 'max_features': 'sqrt', 'max_depth': 6}
+
+    model = RandomForestClassifier(**parameters)
+    model.fit(x, y)
+test = pd.DataFrame({'col_name': clf.feature_importances_}, index=x.columns).sort_values(by='col_name', ascending=False)
 #############################################################################################################
