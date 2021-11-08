@@ -79,13 +79,9 @@ def process_family():
 
 def process_fare():
     global train_data
-    stdsc = StandardScaler()
-    X_train_std = stdsc.fit_transform(train_data["Fare"].values)
-    print(X_train_std)
-    #train_data_norm = mms.fit_transform(train_data["Fare"])
-    #print(train_data_norm)
-    #train_data["Fare"] = train_data_norm
+    train_data.Fare.fillna(train_data.iloc[:891].Fare.mean(), inplace=True)
     return train_data
+
 
 train_data = get_titles()
 train_data = process_pclass()
