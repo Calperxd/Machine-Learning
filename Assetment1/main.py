@@ -124,7 +124,6 @@ for model in models:
 
 # turn run_gs to True if you want to run the gridsearch again.
 run_gs = True
-
 if run_gs:
     parameter_grid = {
         'max_depth': [4, 6, 8],
